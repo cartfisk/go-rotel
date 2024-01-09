@@ -6,7 +6,7 @@ DOCKER=$(shell which docker)
 
 # Paths to locations, etc
 DOCKER_REGISTRY := "ghcr.io"
-DOCKER_USER := "djthorpe"
+DOCKER_USER := "cartfisk"
 DOCKER_REPOSITORY := "${DOCKER_USER}/go-rotel"
 SERVER_MODULE := "github.com/${DOCKER_REPOSITORY}"
 BUILD_DIR := "build"
@@ -71,4 +71,3 @@ clean:
 	@rm -fr $(BUILD_DIR)
 	@${GO} mod tidy
 	@${GO} clean
-

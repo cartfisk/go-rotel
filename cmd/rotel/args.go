@@ -6,8 +6,8 @@ import (
 	"os"
 
 	// Package imports
-	rotel "github.com/djthorpe/go-rotel/pkg/rotel"
-	version "github.com/djthorpe/go-rotel/pkg/version"
+	rotel "github.com/cartfisk/go-rotel/pkg/rotel"
+	version "github.com/cartfisk/go-rotel/pkg/version"
 
 	// Namespace imports
 	. "github.com/djthorpe/go-errors"

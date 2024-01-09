@@ -10,8 +10,8 @@ import (
 	"sync"
 
 	// Package imports
-	ha "github.com/djthorpe/go-rotel/pkg/ha"
-	rotel "github.com/djthorpe/go-rotel/pkg/rotel"
+	ha "github.com/cartfisk/go-rotel/pkg/ha"
+	rotel "github.com/cartfisk/go-rotel/pkg/rotel"
 	mosquitto "github.com/mutablelogic/go-mosquitto/pkg/mosquitto"
 
 	// Namespace imports

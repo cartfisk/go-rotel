@@ -1,4 +1,4 @@
-module github.com/djthorpe/go-rotel
+module github.com/cartfisk/go-rotel
 
 go 1.13
 
