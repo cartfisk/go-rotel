@@ -147,6 +147,15 @@ func (self *App) Run(ctx context.Context) error {
 		return err
 	}
 
+	// Add speaker selection
+	speakers, err := self.ha.AddSpeakers("rotel_amp00_speakers", "rotel_amp00_speakers", rotel.SPEAKERS)
+	if err != nil {
+		return err
+	}
+	if err := self.PublishComponent(speakers, true); err != nil {
+		return err
+	}
+
 FOR_LOOP:
 	for {
 		select {
@@ -184,6 +193,11 @@ FOR_LOOP:
 					log.Println("error setting source:", err)
 				}
 			}
+			if evt.Component == speakers {
+				if err := self.rotel.SetSpeakers(string(evt.Data)); err != nil {
+					log.Println("error setting speakers:", err)
+				}
+			}
 		case evt := <-rotelch:
 			if evt.Err != nil {
 				self.Logger.Println("rotel error", evt.Err)
@@ -205,6 +219,10 @@ FOR_LOOP:
 			if evt.Flag.Is(rotel.ROTEL_FLAG_SOURCE) {
 				v := self.rotel.Source()
 				self.StateCallback(source, []byte(v))
+			}
+			if evt.Flag.Is(rotel.ROTEL_FLAG_SPEAKERS) {
+				v := self.rotel.Speakers()
+				self.StateCallback(speakers, []byte(v))
 			}
 		}
 	}

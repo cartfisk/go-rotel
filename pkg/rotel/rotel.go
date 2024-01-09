@@ -51,6 +51,9 @@ var (
 	SOURCES = []string{
 		"pc_usb", "cd", "coax1", "coax2", "opt1", "opt2", "aux1", "aux2", "tuner", "phono", "usb", "bluetooth",
 	}
+	SPEAKERS = []string{
+		"a", "b", "a_b", "off",
+	}
 )
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -161,6 +164,31 @@ func (self *Rotel) SetSource(value string) error {
 		return self.writetty(value + "!")
 	default:
 		return ErrBadParameter.Withf("invalid source: %q", value)
+	}
+}
+
+func (self *Rotel) SetSpeakers(value string) error {
+	// Cannot set value when power is off
+	if !self.Power() {
+		return ErrOutOfOrder.With("SetSpeakers")
+	}
+
+	// Check parameter and send command
+	switch value {
+	case "a_b":
+		self.writetty("speaker_a_on!")
+		return self.writetty("speaker_b_on!")
+	case "a":
+		self.writetty("speaker_a_on!")
+		return self.writetty("speaker_b_off!")
+	case "b":
+		self.writetty("speaker_b_on!")
+		return self.writetty("speaker_a_off!")
+	case "off":
+		self.writetty("speaker_a_off!")
+		return self.writetty("speaker_b_off!")
+	default:
+		return ErrBadParameter.Withf("invalid speakers: %q", value)
 	}
 }
 

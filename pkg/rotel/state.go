@@ -22,7 +22,7 @@ type state struct {
 	source        string
 	freq          string
 	bypass        string
-	speaker       string
+	speakers      string
 	dimmer        string
 	volume_update bool
 }
@@ -46,7 +46,7 @@ var (
 		{regexp.MustCompile("^source=(\\w+)$"), SetSource},
 		{regexp.MustCompile("^freq=(.+)$"), SetFreq},
 		{regexp.MustCompile("^bypass=(on|off)$"), SetBypass},
-		{regexp.MustCompile("^speaker=(a|b|a_b|off)$"), SetSpeaker},
+		{regexp.MustCompile("^speaker=(a|b|a_b|off)$"), SetSpeakers},
 		{regexp.MustCompile("^dimmer=(\\d+)$"), SetDimmer},
 	}
 )
@@ -139,18 +139,11 @@ func (this *state) Freq() string {
 	}
 }
 
-func (this *state) Speakers() []string {
+func (this *state) Speakers() string {
 	if this.power == "on" {
-		switch this.speaker {
-		case "a":
-			return []string{"A"}
-		case "b":
-			return []string{"B"}
-		case "a_b":
-			return []string{"A", "B"}
-		}
+		return this.speakers
 	}
-	return nil
+	return ""
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -175,7 +168,7 @@ func (this *state) Update() string {
 		return "freq?"
 	case this.bypass == "":
 		return "bypass?"
-	case this.speaker == "":
+	case this.speakers == "":
 		return "speaker?"
 	case this.mute == "":
 		return "mute?"
@@ -315,10 +308,10 @@ func SetBypass(this *state, args []string) (Flag, error) {
 	return 0, nil
 }
 
-func SetSpeaker(this *state, args []string) (Flag, error) {
-	if args[0] != this.speaker {
-		this.speaker = args[0]
-		return ROTEL_FLAG_SPEAKER, nil
+func SetSpeakers(this *state, args []string) (Flag, error) {
+	if args[0] != this.speakers {
+		this.speakers = args[0]
+		return ROTEL_FLAG_SPEAKERS, nil
 	}
 	return 0, nil
 }

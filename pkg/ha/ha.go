@@ -141,6 +141,17 @@ func (self *HA) AddInput(id, object_id string, options []string) (Component, err
 	return component, nil
 }
 
+func (self *HA) AddSpeakers(id, object_id string, options []string) (Component, error) {
+	component, err := NewSpeakers(self.topic, id, object_id, options)
+	if err != nil {
+		return nil, err
+	}
+	if err := self.AddComponent(component); err != nil {
+		return nil, err
+	}
+	return component, nil
+}
+
 func (self *HA) AddComponent(component Component) error {
 	key := component.Id()
 	if _, exists := self.components[key]; exists {
