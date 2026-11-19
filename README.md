@@ -30,7 +30,7 @@ with a specific ip address and port 1883. The command line arguments for the rot
 ```bash
 Usage of rotel:
   -credentials string
-    	MQTT credentials (user:password)
+    	MQTT credentials (user:password), or set ROTEL_MQTT_CREDENTIALS
   -id string
     	Unique identifier for Rotel device (default "amp00")
   -mqtt string
@@ -44,6 +44,10 @@ Usage of rotel:
   -version
     	Print version and exit
 ```
+
+To keep the MQTT password off the command line (where `ps` shows it), leave
+out `-credentials` and set `ROTEL_MQTT_CREDENTIALS=user:password` instead,
+for example with `docker run -e ROTEL_MQTT_CREDENTIALS ...`.
 
 ## Building the Docker Container
 

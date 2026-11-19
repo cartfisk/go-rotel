@@ -37,6 +37,7 @@ const (
 	defaultTopic       = "homeassistant"
 	defaultIdentifier  = "amp00"
 	defaultCredentials = ""
+	credentialsEnv     = "ROTEL_MQTT_CREDENTIALS"
 )
 
 var (
@@ -57,6 +58,11 @@ func NewArgs(name string, args []string) (*Args, error) {
 	// Parse flags
 	if err := self.Parse(args); err != nil {
 		return nil, err
+	}
+	// Fall back to the environment, which keeps the password out of the
+	// process command line
+	if self.Credentials == "" {
+		self.Credentials = os.Getenv(credentialsEnv)
 	}
 	// No arguments are allowed
 	if self.NArg() > 0 {
@@ -98,7 +104,7 @@ func (self *Args) String() string {
 
 func (self *Args) registerFlags() {
 	self.StringVar(&self.Broker, "mqtt", defaultBroker, "MQTT broker address")
-	self.StringVar(&self.Credentials, "credentials", defaultCredentials, "MQTT credentials (user:password)")
+	self.StringVar(&self.Credentials, "credentials", defaultCredentials, "MQTT credentials (user:password), or set "+credentialsEnv)
 	self.StringVar(&self.Topic, "topic", defaultTopic, "Topic for messages")
 	self.StringVar(&self.Id, "id", defaultIdentifier, "Unique identifier for Rotel device")
 	self.IntVar(&self.Qos, "qos", 0, "MQTT quality of service")
