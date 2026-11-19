@@ -229,35 +229,34 @@ func (self *Rotel) SetTreble(value int) error {
 	}
 }
 
-/*
-func (this *Manager) SetMute(state bool) error {
+func (self *Rotel) SetMute(state bool) error {
 	// Cannot set value when power is off
-	if this.Power() == false {
+	if !self.Power() {
 		return ErrOutOfOrder.With("SetMute")
 	}
 
-	// Check parameter and send command
 	if state {
-		return this.writetty("mute_on!")
+		return self.writetty("mute_on!")
 	} else {
-		return this.writetty("mute_off!")
+		return self.writetty("mute_off!")
 	}
 }
 
-func (this *Manager) SetBypass(state bool) error {
+// SetBypass bypasses (true) or enables (false) the bass and treble controls
+func (self *Rotel) SetBypass(state bool) error {
 	// Cannot set value when power is off
-	if this.Power() == false {
+	if !self.Power() {
 		return ErrOutOfOrder.With("SetBypass")
 	}
 
-	// Check parameter and send command
 	if state {
-		return this.writetty("bypass_on!")
+		return self.writetty("bypass_on!")
 	} else {
-		return this.writetty("bypass_off!")
+		return self.writetty("bypass_off!")
 	}
 }
 
+/*
 func (this *Manager) SetBalance(loc string) error {
 	// Cannot set value when power is off
 	if this.Power() == false {

@@ -132,6 +132,18 @@ func (self *HA) AddSpeaker(prefix, suffix string, speakerName string) (Component
 	return component, nil
 }
 
+func (self *HA) AddSwitch(prefix, suffix string, name, icon string) (Component, error) {
+	object_id := strings.ToLower(prefix + "_" + suffix)
+	component, err := NewSwitch(self.topic, object_id, object_id, name, icon)
+	if err != nil {
+		return nil, err
+	}
+	if err := self.AddComponent(component); err != nil {
+		return nil, err
+	}
+	return component, nil
+}
+
 func (self *HA) AddVolume(prefix, suffix string) (Component, error) {
 	object_id := strings.ToLower(prefix + "_" + suffix)
 	component, err := NewVolume(self.topic, object_id, object_id)
