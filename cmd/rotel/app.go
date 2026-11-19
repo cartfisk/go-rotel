@@ -36,8 +36,11 @@ type App struct {
 	// Event channel
 	evtch chan *mosquitto.Event
 
-	// State change channel
-	statech chan StateChange
+	// State changes waiting to be applied, only touched by the Run loop
+	pending []StateChange
+
+	// Power component, the only one accepting commands while the amp is off
+	power ha.Component
 
 	// Online/Offline messages
 	topicStatusId string
@@ -77,7 +80,7 @@ func NewApp(ctx context.Context, prefix, broker, credentials, id string, qos int
 	}
 
 	// Home assistant
-	ha, err := ha.New(topic, self.StateCallback)
+	ha, err := ha.New(topic, self.CommandCallback)
 	if err != nil {
 		return nil, fmt.Errorf("Home Assistant: %q: %w", topic, err)
 	}
@@ -112,9 +115,8 @@ func (self *App) Run(ctx context.Context) error {
 	var wg sync.WaitGroup
 	var result error
 
-	// Create channels for events and state changes
+	// Create channels for events
 	self.evtch = make(chan *mosquitto.Event, 1)
-	self.statech = make(chan StateChange, 2)
 	rotelch := make(chan rotel.Event, 1)
 
 	// Run rotel amplifier in background
@@ -140,6 +142,7 @@ func (self *App) Run(ctx context.Context) error {
 	if err := self.PublishComponent(power, true); err != nil {
 		return err
 	}
+	self.power = power
 
 	// Add speaker A
 	speakerA, err := self.ha.AddSpeaker(self.id, "speaker_a", "Speaker A")
@@ -156,6 +159,24 @@ func (self *App) Run(ctx context.Context) error {
 		return err
 	}
 	if err := self.PublishComponent(speakerB, true); err != nil {
+		return err
+	}
+
+	// Add mute
+	mute, err := self.ha.AddSwitch(self.id, "mute", "Mute", "mdi:volume-off")
+	if err != nil {
+		return err
+	}
+	if err := self.PublishComponent(mute, true); err != nil {
+		return err
+	}
+
+	// Add tone bypass (ON bypasses the bass and treble controls)
+	toneBypass, err := self.ha.AddSwitch(self.id, "tone_bypass", "Tone Bypass", "mdi:tune-variant")
+	if err != nil {
+		return err
+	}
+	if err := self.PublishComponent(toneBypass, true); err != nil {
 		return err
 	}
 
@@ -196,6 +217,66 @@ func (self *App) Run(ctx context.Context) error {
 		return err
 	}
 
+	// Apply a queued state change: publish it to HA and send it to the amp
+	apply := func(evt StateChange) error {
+		self.Logger.Println("publishing", string(evt.Data), "to", evt.Component.StateTopic())
+		if _, err := self.client.Publish(evt.Component.StateTopic(), evt.Data, mosquitto.OptRetain()); err != nil {
+			return err
+		}
+		if evt.Component == power {
+			if err := self.rotel.SetPower(string(evt.Data) == "ON"); err != nil {
+				log.Println("error setting power:", err)
+			}
+		}
+		if evt.Component == speakerA {
+			if err := self.rotel.SetSpeaker(string(evt.Data) == "ON", "a"); err != nil {
+				log.Println("error setting speaker A:", err)
+			}
+		}
+		if evt.Component == speakerB {
+			if err := self.rotel.SetSpeaker(string(evt.Data) == "ON", "b"); err != nil {
+				log.Println("error setting speaker B:", err)
+			}
+		}
+		if evt.Component == mute {
+			if err := self.rotel.SetMute(string(evt.Data) == "ON"); err != nil {
+				log.Println("error setting mute:", err)
+			}
+		}
+		if evt.Component == toneBypass {
+			if err := self.rotel.SetBypass(string(evt.Data) == "ON"); err != nil {
+				log.Println("error setting tone bypass:", err)
+			}
+		}
+		if evt.Component == volume {
+			if value, err := strconv.ParseUint(string(evt.Data), 10, 32); err != nil {
+				log.Println("error parsing volume:", err)
+			} else if err := self.rotel.SetVolume(uint(value)); err != nil {
+				log.Println("error setting volume:", err)
+			}
+		}
+		if evt.Component == source {
+			if err := self.rotel.SetSource(string(evt.Data)); err != nil {
+				log.Println("error setting source:", err)
+			}
+		}
+		if evt.Component == bass {
+			if value, err := strconv.ParseInt(string(evt.Data), 10, 32); err != nil {
+				log.Println("error parsing bass:", err)
+			} else if err := self.rotel.SetBass(int(value)); err != nil {
+				log.Println("error setting bass:", err)
+			}
+		}
+		if evt.Component == treble {
+			if value, err := strconv.ParseInt(string(evt.Data), 10, 32); err != nil {
+				log.Println("error parsing treble:", err)
+			} else if err := self.rotel.SetTreble(int(value)); err != nil {
+				log.Println("error setting treble:", err)
+			}
+		}
+		return nil
+	}
+
 FOR_LOOP:
 	for {
 		select {
@@ -220,52 +301,6 @@ FOR_LOOP:
 				}
 			} else if err := self.ha.Command(evt.Topic, evt.Data); err != nil {
 				log.Println("other event: ", evt)
-			}
-		case evt := <-self.statech:
-			self.Logger.Println("publishing", string(evt.Data), "to", evt.Component.StateTopic())
-			if _, err := self.client.Publish(evt.Component.StateTopic(), evt.Data, mosquitto.OptRetain()); err != nil {
-				return err
-			}
-			if evt.Component == power {
-				if err := self.rotel.SetPower(string(evt.Data) == "ON"); err != nil {
-					log.Println("error setting power:", err)
-				}
-			}
-			if evt.Component == speakerA {
-				if err := self.rotel.SetSpeaker(string(evt.Data) == "ON", "a"); err != nil {
-					log.Println("error setting speaker A:", err)
-				}
-			}
-			if evt.Component == speakerB {
-				if err := self.rotel.SetSpeaker(string(evt.Data) == "ON", "b"); err != nil {
-					log.Println("error setting speaker B:", err)
-				}
-			}
-			if evt.Component == volume {
-				if value, err := strconv.ParseUint(string(evt.Data), 10, 32); err != nil {
-					log.Println("error parsing volume:", err)
-				} else if err := self.rotel.SetVolume(uint(value)); err != nil {
-					log.Println("error setting volume:", err)
-				}
-			}
-			if evt.Component == source {
-				if err := self.rotel.SetSource(string(evt.Data)); err != nil {
-					log.Println("error setting source:", err)
-				}
-			}
-			if evt.Component == bass {
-				if value, err := strconv.ParseInt(string(evt.Data), 10, 32); err != nil {
-					log.Println("error parsing bass:", err)
-				} else if err := self.rotel.SetBass(int(value)); err != nil {
-					log.Println("error setting bass:", err)
-				}
-			}
-			if evt.Component == treble {
-				if value, err := strconv.ParseInt(string(evt.Data), 10, 32); err != nil {
-					log.Println("error parsing treble:", err)
-				} else if err := self.rotel.SetTreble(int(value)); err != nil {
-					log.Println("error setting treble:", err)
-				}
 			}
 		case evt := <-rotelch:
 			if evt.Err != nil {
@@ -294,6 +329,20 @@ FOR_LOOP:
 					self.StateCallback(speakerB, []byte("OFF"))
 				}
 			}
+			if evt.Flag.Is(rotel.ROTEL_FLAG_MUTE) {
+				if self.rotel.Muted() {
+					self.StateCallback(mute, []byte("ON"))
+				} else {
+					self.StateCallback(mute, []byte("OFF"))
+				}
+			}
+			if evt.Flag.Is(rotel.ROTEL_FLAG_BYPASS) {
+				if self.rotel.Bypass() {
+					self.StateCallback(toneBypass, []byte("ON"))
+				} else {
+					self.StateCallback(toneBypass, []byte("OFF"))
+				}
+			}
 			if evt.Flag.Is(rotel.ROTEL_FLAG_VOLUME) {
 				str := fmt.Sprintf("%d", self.rotel.Volume())
 				self.StateCallback(volume, []byte(str))
@@ -309,6 +358,17 @@ FOR_LOOP:
 			if evt.Flag.Is(rotel.ROTEL_FLAG_TREBLE) {
 				str := fmt.Sprintf("%d", self.rotel.Treble())
 				self.StateCallback(treble, []byte(str))
+			}
+		}
+
+		// Apply state changes queued while handling the event above. This is a
+		// queue, not a channel, because this loop is its only reader: sending to
+		// a full channel from here deadlocked go-rotel.
+		for len(self.pending) > 0 {
+			evt := self.pending[0]
+			self.pending = self.pending[1:]
+			if err := apply(evt); err != nil {
+				return err
 			}
 		}
 	}
@@ -329,7 +389,6 @@ FOR_LOOP:
 	}
 
 	// Close channels
-	close(self.statech)
 	close(self.evtch)
 
 	// Return any errors
@@ -373,11 +432,22 @@ func (self *App) StateCallback(component ha.Component, data []byte) error {
 	if component.SetState(string(data)) {
 		self.Logger.Println("setting component state to", string(data), "for", component.StateTopic())
 		payload := []byte(component.State())
-		self.statech <- StateChange{component, payload}
+		self.pending = append(self.pending, StateChange{component, payload})
 	}
 
 	// Return success
 	return nil
+}
+
+// CommandCallback handles a command from Home Assistant. While the amp is off
+// only power is accepted: the amp ignores everything else, and taking the
+// command as new state would leave HA showing a value the amp never had.
+func (self *App) CommandCallback(component ha.Component, data []byte) error {
+	if component != self.power && !self.rotel.Power() {
+		self.Logger.Println("ignoring", string(data), "for", component.CommandTopic(), "while power is off")
+		return nil
+	}
+	return self.StateCallback(component, data)
 }
 
 ///////////////////////////////////////////////////////////////////////////////
