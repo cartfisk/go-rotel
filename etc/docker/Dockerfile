@@ -1,7 +1,7 @@
 ARG OS
 ARG ARCH
 
-FROM --platform=${OS}/${ARCH} golang:1.21-bullseye AS builder
+FROM --platform=${OS}/${ARCH} golang:1.21-bookworm AS builder
 ARG OS
 ARG ARCH
 ARG SOURCE
@@ -14,7 +14,7 @@ RUN apt update && apt install -y libmosquitto-dev
 RUN make
 
 # Copy server to /usr/local/bin
-FROM --platform=${OS}/${ARCH} debian:bullseye-slim
+FROM --platform=${OS}/${ARCH} debian:bookworm-slim
 ARG OS
 ARG ARCH
 ARG SOURCE
