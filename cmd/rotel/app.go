@@ -60,6 +60,9 @@ func NewApp(ctx context.Context, prefix, broker, credentials, id string, qos int
 			if self.evtch != nil {
 				self.evtch <- evt
 			}
+		} else if evt.Type == MOSQ_FLAG_EVENT_DISCONNECT && evt.Err != nil {
+			// The client does not reconnect, so exit and let the supervisor restart us
+			log.Fatalln("MQTT: lost connection to broker:", evt.Err)
 		}
 	})
 	if credentials := strings.TrimSpace(credentials); credentials != "" {
@@ -204,14 +207,23 @@ FOR_LOOP:
 					log.Println("error setting status:", err)
 				} else {
 					log.Println("Home assistant status has changed:", self.ha)
-					// TODO: Get all latest rotel state
+					// Republish known state when Home Assistant comes online
+					if self.ha.HAStatus == ha.HAStatusOnline {
+						for _, component := range self.ha.Components() {
+							if topic, state := component.StateTopic(), component.State(); topic != "" && state != "" {
+								if _, err := self.client.Publish(topic, []byte(state), mosquitto.OptRetain()); err != nil {
+									return err
+								}
+							}
+						}
+					}
 				}
 			} else if err := self.ha.Command(evt.Topic, evt.Data); err != nil {
 				log.Println("other event: ", evt)
 			}
 		case evt := <-self.statech:
 			self.Logger.Println("publishing", string(evt.Data), "to", evt.Component.StateTopic())
-			if _, err := self.client.Publish(evt.Component.StateTopic(), evt.Data); err != nil {
+			if _, err := self.client.Publish(evt.Component.StateTopic(), evt.Data, mosquitto.OptRetain()); err != nil {
 				return err
 			}
 			if evt.Component == power {
